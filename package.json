@@ -1,6 +1,6 @@
 {
+    "type": "module",
     "name": "html-experiment",
-    "version": "1.0.0",
     "scripts": {
        "serve": "npx serve ./src" 
     }
