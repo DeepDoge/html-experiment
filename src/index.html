@@ -6,10 +6,7 @@
     <title>Document</title>
     <script type="module" src="./lib.js"></script>
     <script type="module">
-      $customElement(
-        "x-counter",
-        await fetch("./counter.html").then((response) => response.text())
-      );
+      $customElement("x-counter", "/counter");
     </script>
   </head>
 

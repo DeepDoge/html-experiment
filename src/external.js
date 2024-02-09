@@ -1,3 +1,3 @@
-export function sayHello(shouldGiveError) {
+export function sayHello() {
   console.log("Hello from external module");
 }

@@ -1,7 +1,6 @@
-<template>
-  <div class="counter">
-    <button @click="(event) => $root(this).$increment()">+</button>
-    <span bind:count="(value) => this.textContent = value"></span>
-    <button @click="(event, { $decrement }) => $decrement()">-</button>
-  </div>
-</template>
+<div class="counter">
+  <button @click="(event, { alertHello }) => alertHello()">Hello</button>
+  <button @click="(event, { increment }) => increment()">+</button>
+  <span bind:count="(value) => this.textContent = value"></span>
+  <button @click="(event, { decrement }) => decrement()">-</button>
+</div>

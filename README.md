@@ -27,3 +27,8 @@ Duck:
 - but i dont think typing support will be good with tagged template literals. I have to think about this another time.
 - tagged template literals works amazing, with style and the rest, and looks amazing too, highlight are working. But intellisense is not working at all with `<script>` tags. So maybe i might try to find a vite plugin or something or rollup plugin to seperate them. So these are neccery for ssr stuff.
 - also i tried to to this `bind:` thingy here but a real signal might be necessary. So we might need to use a real signal for this. But
+
+UPDATE:
+Ok i started to came up with something, gotta clean these all when im done.
+ok maybe i make a thing that doesnt need an ssr backend.
+then i can make an ssr backend that uses it, which also can have service worker as ssr backend.

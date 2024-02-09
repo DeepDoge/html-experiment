@@ -3,5 +3,8 @@
         "baseUrl": "./",
         "module": "ESNext",
         "target": "ESNext",
+        "paths": {
+            "/*": ["src/*"],
+        }
     }
 }
