@@ -1,0 +1,42 @@
+<script type="module">
+  import { externalValue } from "./external.js";
+
+  $self.$count = externalValue;
+
+  $self.$increment = () => {
+    $self.$count++;
+    update();
+  };
+
+  $self.$decrement = () => {
+    $self.$count--;
+    update();
+  };
+
+  function update() {
+    $dispatchEvent($self, new CustomEvent("::update"));
+  }
+  $importElement("x-span", "./default.html", "span");
+</script>
+
+<div class="counter">
+  <button onclick="$root(this).$increment()">+</button>
+  <span
+    is="x-span"
+    on:ready="this.textContent = $root(this).$count; 
+    $root(this).addEventListener('::update', (event) => this.textContent = $root(this).$count)"
+  ></span>
+  <button onclick="$root(this).$decrement()">-</button>
+</div>
+
+<style>
+  .counter {
+    display: grid;
+    grid-auto-flow: column;
+    gap: 1em;
+  }
+
+  button {
+    border-color: red;
+  }
+</style>
