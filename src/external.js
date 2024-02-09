@@ -1,1 +1,3 @@
-export const externalValue = 1;
+export function sayHello() {
+  console.log("Hello from external module");
+}

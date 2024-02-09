@@ -5,12 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Document</title>
     <script src="./lib.js"></script>
+    <script type="module">
+      $customElement(
+        "x-counter",
+        await fetch("./counter.html").then((response) => response.text())
+      );
+    </script>
   </head>
 
   <body>
-    <script>
-      $importElement("x-counter", "./counter.html");
-    </script>
     <x-counter></x-counter>
     <x-counter></x-counter>
   </body>

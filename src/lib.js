@@ -1,11 +1,11 @@
 {
-  Object.assign(globalThis, { $importElement, $root, $dispatchEvent });
+  Object.assign(globalThis, { $customElement, $root, $dispatchEvent });
 
   const tagNameToConstructor = new Map();
-  const definedCustomElements = new Set();
-  async function $importElement(tagName, url, extendsTagName) {
-    if (definedCustomElements.has(tagName)) return;
-    definedCustomElements.add(tagName);
+  const usedTags = new Set();
+  async function $customElement(tagName, html, extendsTagName) {
+    if (usedTags.has(tagName)) return;
+    usedTags.add(tagName);
 
     let extendsConstructor;
     if (extendsTagName) {
@@ -17,73 +17,72 @@
       }
     }
 
-    return await fetch(url)
-      .then((response) => response.text())
-      .then((html) => {
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(
-          `<template>${html}</template>`,
-          "text/html"
-        );
-        const template = doc.querySelector("template");
+    const parser = new DOMParser();
+    const root = parser
+      .parseFromString(`<template>${html}</template>`, "text/html")
+      .querySelector("template").content;
 
-        const sheet = new CSSStyleSheet();
-        const style = template.content.querySelector("style");
-        if (style) {
-          style.remove();
-          sheet.replaceSync(style.textContent);
+    const template = root.querySelector("template");
+    template?.content.append(...root.querySelectorAll("script"));
+
+    const styles = root.querySelectorAll("style");
+    const sheets = new Array(styles.length);
+    {
+      let index = 0;
+      for (const style of styles) {
+        let sheet = style.sheet;
+        if (!sheet) {
+          sheet = new CSSStyleSheet();
+          await sheet.replace(style.textContent);
+        }
+        sheets[index] = sheet;
+        style.remove();
+        index++;
+      }
+    }
+
+    class CustomElement extends (extendsConstructor ?? HTMLElement) {
+      static instances = new WeakRefMap();
+      constructor() {
+        super();
+        const shadowRoot = this.attachShadow({ mode: "open" });
+
+        const fragment = template?.content.cloneNode(true);
+        const id = Math.random().toString(36).slice(2);
+        CustomElement.instances.set(id, this);
+        fragment
+          ?.querySelectorAll('script[type="module"]')
+          .forEach((script) => {
+            script.firstChild?.before(
+              `const $self=customElements.get("${tagName}").instances.get("${id}");`
+            );
+          });
+        shadowRoot.adoptedStyleSheets.push(...sheets);
+        if (fragment) shadowRoot.appendChild(fragment);
+        $dispatchEvent(this, ":ready");
+      }
+
+      connectedCallback() {
+        if (super.connectedCallback) {
+          super.connectedCallback();
+        }
+        $dispatchEvent(this, ":connected");
+      }
+
+      disconnectedCallback() {
+        if (super.disconnectedCallback) {
+          super.disconnectedCallback();
         }
 
-        class CustomElement extends (extendsConstructor ?? HTMLElement) {
-          static newInstances = new WeakRefMap();
-          constructor() {
-            super();
-            const shadowRoot = this.attachShadow({ mode: "open" });
+        $dispatchEvent(this, ":disconnected");
+      }
+    }
 
-            const fragment = template.content.cloneNode(true);
-            const id = Math.random().toString(36).slice(2);
-            CustomElement.newInstances.set(id, this);
-            fragment
-              .querySelectorAll('script[type="module"]')
-              .forEach((script) => {
-                script.append(
-                  `$dispatchEvent($self, new CustomEvent(":ready"));`
-                );
-                script.firstChild.before(
-                  `const $Self=customElements.get("${tagName}");`,
-                  `const $self=$Self.newInstances.get("${id}");`
-                );
-              });
-
-            shadowRoot.adoptedStyleSheets.push(sheet);
-            shadowRoot.appendChild(fragment);
-            $dispatchEvent(this, new CustomEvent(":ready"));
-
-            // enchancedMutationObserver.observe(this, { attributes: true });
-          }
-
-          connectedCallback() {
-            if (super.connectedCallback) {
-              super.connectedCallback();
-            }
-            $dispatchEvent(this, new CustomEvent(":connected"));
-          }
-
-          disconnectedCallback() {
-            if (super.disconnectedCallback) {
-              super.disconnectedCallback();
-            }
-
-            $dispatchEvent(this, new CustomEvent(":disconnected"));
-          }
-        }
-
-        customElements.define(
-          tagName,
-          CustomElement,
-          extendsConstructor ? { extends: extendsTagName } : undefined
-        );
-      });
+    customElements.define(
+      tagName,
+      CustomElement,
+      extendsConstructor ? { extends: extendsTagName } : undefined
+    );
   }
 
   function $root(thisArg) {
@@ -94,31 +93,90 @@
     return root;
   }
 
-  function $dispatchEvent(element, event) {
+  function $dispatchEvent(element, ...eventArgs) {
+    const event = new CustomEvent(...eventArgs);
     element.dispatchEvent(event);
-    element[`on${event.type}`]?.(event);
-    (function () {
-      eval(element.getAttribute(`on${event.type}`) ?? "");
-    }).call(element, event);
   }
 
-  /*   const enchancedMutationObserver = new MutationObserver((mutations) => {
-    for (const mutation of mutations) {
-      if (mutation.type === "attributes") {
-        const { target, attributeName, oldValue } = mutation;
-        const newValue = target.getAttribute(attributeName);
-        if (attributeName.startsWith("@")) {
-          target.addEventListener(
-            attributeName.slice(1),
-            function (event) {
-              eval(newValue).call(this, event);
-            }.bind(target)
-          );
+  {
+    /**
+     * @type {WeakMap<Element, Map<string, Function>>}
+     */
+    const oldEventsMap = new WeakMap();
+
+    /**
+     *
+     * @param {Element} element
+     * @param {string} attributeName
+     * @param {string} oldValue
+     * @param {string} newValue
+     */
+    function hydrateElementAttribute(
+      element,
+      attributeName,
+      oldValue,
+      newValue
+    ) {
+      if (attributeName.startsWith("@")) {
+        const eventName = attributeName.slice(1);
+        let oldEvents = oldEventsMap.get(element);
+        if (!oldEvents) oldEventsMap.set(element, (oldEvents = new Map()));
+
+        const oldEvent = oldEvents.get(eventName);
+        if (oldEvent) {
+          element.removeEventListener(eventName, oldEvent);
         }
+
+        const fn = (event) =>
+          new Function(`return (${newValue})`).call(element)(
+            event,
+            $root(element)
+          );
+        element.addEventListener(eventName, fn);
+        oldEvents.set(eventName, fn);
       }
     }
-  });
- */
+    const hydratedElements = new WeakSet();
+    function tryHydrateElement(element) {
+      if (hydratedElements.has(element)) return;
+      hydratedElements.add(element);
+      for (const attribute of element.attributes) {
+        hydrateElementAttribute(element, attribute.name, null, attribute.value);
+      }
+    }
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (mutation.type === "attributes") {
+          const { target, attributeName, oldValue } = mutation;
+          const newValue = target.getAttribute(attributeName);
+          hydrateElementAttribute(target, attributeName, oldValue, newValue);
+        }
+        if (mutation.type === "childList") {
+          for (const node of mutation.addedNodes) {
+            if (node instanceof Element) {
+              node.querySelectorAll("*").forEach(tryHydrateElement);
+            }
+          }
+        }
+      }
+    });
+    observer.observe(document, {
+      attributes: true,
+      subtree: true,
+      childList: true,
+    });
+    const originalAttachShadow = Element.prototype.attachShadow;
+    Element.prototype.attachShadow = function (...args) {
+      const shadowRoot = originalAttachShadow.apply(this, args);
+      observer.observe(shadowRoot, {
+        attributes: true,
+        subtree: true,
+        childList: true,
+      });
+      return shadowRoot;
+    };
+  }
+
   class WeakRefMap {
     #cacheMap = new Map();
     #finalizer = new FinalizationRegistry((key) => this.#cacheMap.delete(key));
