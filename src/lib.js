@@ -117,6 +117,7 @@
       oldValue,
       newValue
     ) {
+      if (element instanceof HTMLTemplateElement) return;
       if (attributeName.startsWith("@")) {
         const eventName = attributeName.slice(1);
         let oldEvents = oldEventsMap.get(element);
@@ -138,8 +139,10 @@
     }
     const hydratedElements = new WeakSet();
     function tryHydrateElement(element) {
+      if (element instanceof HTMLTemplateElement) return;
       if (hydratedElements.has(element)) return;
       hydratedElements.add(element);
+
       for (const attribute of element.attributes) {
         hydrateElementAttribute(element, attribute.name, null, attribute.value);
       }
