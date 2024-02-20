@@ -5,7 +5,7 @@ This is some experimental way to build sites using native vanilla js apis and we
 ## Update
 Ok so this idea might shift to [here](https://github.com/DeepDoge/experiment-idk)
 
-Duck:
+## Duck
 
 - Not needing any build step.
 - Everything should be done with html and attributes and some js.
