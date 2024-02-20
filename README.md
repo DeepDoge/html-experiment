@@ -2,6 +2,9 @@
 
 This is some experimental way to build sites using native vanilla js apis and web components. Just trying and experimenting with some ideas. And how can i make it work.
 
+## Update
+Ok so this idea might shift to [here](https://github.com/DeepDoge/experiment-idk)
+
 Duck:
 
 - Not needing any build step.
